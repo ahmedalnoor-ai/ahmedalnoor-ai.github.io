@@ -119,6 +119,8 @@ a,button{cursor:none}
   letter-spacing:.04em;text-align:center;max-width:50ch;line-height:1.7;
   opacity:0;animation:fU 1.2s var(--E) 1.5s forwards;text-shadow:0 0 30px rgba(0,0,0,.9)}
 .hero-sub em{font-style:normal;color:var(--amber-w)}
+#hero-vignette{position:absolute;inset:0;pointer-events:none;z-index:2;
+  background:radial-gradient(ellipse 42% 28% at 50% 52%,rgba(0,0,0,0.46) 0%,transparent 100%)}
 .hero-cv-btn{display:inline-flex;align-items:center;gap:10px;margin-top:36px;
   padding:14px 30px;border:1px solid var(--amber);border-radius:100px;
   font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.24em;
@@ -451,6 +453,7 @@ footer{padding:48px clamp(20px,4vw,64px) 34px;border-top:1px solid var(--line);
 </header>
 <div id="scroll-body">
 <section id="hero">
+  <div id="hero-vignette"></div>
   <div class="hero-eyebrow">Brand Architect · UAE</div>
   <div id="hero-title" aria-label="Architect of Brand Worlds">
     <div class="t-row" id="row1"></div>
@@ -1342,6 +1345,12 @@ var starMat=new THREE.ShaderMaterial({
   transparent:true,depthWrite:false,blending:THREE.AdditiveBlending});
 scene.add(new THREE.Points(sg,starMat));
 
+/* ORB GROUP — tilted, offset so it reads as orbital, not a spinner */
+var orbGroup=new THREE.Group();
+orbGroup.rotation.z=-0.21;
+orbGroup.position.set(-5,2,0);
+scene.add(orbGroup);
+
 /* ECLIPSE SPHERE */
 var eclipseMat=new THREE.ShaderMaterial({
   uniforms:{uTime:{value:0}},
@@ -1359,20 +1368,24 @@ var eclipseMat=new THREE.ShaderMaterial({
     varying vec3 vPosition;
     void main(){
       vec3 viewDir=normalize(-vPosition);
-      float rim=pow(1.0-max(dot(vNormal,viewDir),0.0),3.5);
+      float facing=max(dot(vNormal,viewDir),0.0);
+      float rim=pow(1.0-facing,3.5);
+      float heat=pow(facing,2.5);
       vec3 colA=vec3(0.976,0.451,0.086);
       vec3 colB=vec3(0.984,0.749,0.141);
+      vec3 heatCol=vec3(1.0,0.71,0.20);
       vec3 rimColor=mix(colA,colB,rim);
       float shimmer=0.5+0.5*sin(uTime*0.7+vPosition.x*0.5+vPosition.y*0.4+vPosition.z*0.3);
-      vec3 base=vec3(0.039,0.027,0.023);
+      vec3 base=vec3(0.026,0.016,0.014);
       vec3 color=mix(base,rimColor,rim*shimmer);
-      float alpha=0.82+rim*0.18;
+      color+=heatCol*heat*0.07;
+      float alpha=0.86+rim*0.14;
       gl_FragColor=vec4(color,alpha);
     }`,
   transparent:true});
 var eclipse=new THREE.Mesh(new THREE.SphereGeometry(32,64,64),eclipseMat);
 eclipse.position.set(0,0,-20);
-scene.add(eclipse);
+orbGroup.add(eclipse);
 
 /* CORONA PLANE */
 var coronaMat=new THREE.ShaderMaterial({
@@ -1395,7 +1408,7 @@ var coronaMat=new THREE.ShaderMaterial({
   transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide});
 var corona=new THREE.Mesh(new THREE.PlaneGeometry(160,160),coronaMat);
 corona.position.set(0,0,-22);
-scene.add(corona);
+orbGroup.add(corona);
 
 /* TORUS RINGS — arc-lit shader */
 var _rV=`varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`;
@@ -1431,8 +1444,8 @@ var ringDefs=[
    hot:new THREE.Color(0.96,0.62,0.04),cool:new THREE.Color(0.48,0.20,0.02),maxA:0.82},
   {r:62,t:0.9,rx:Math.PI/2.5,ry:-0.2,px:0,  py:0, pz:0,
    hot:new THREE.Color(0.98,0.75,0.14),cool:new THREE.Color(0.38,0.24,0.04),maxA:0.58},
-  {r:78,t:0.6,rx:Math.PI/2.8,ry:0.1, px:0,  py:0, pz:0,
-   hot:new THREE.Color(0.99,0.86,0.67),cool:new THREE.Color(0.22,0.16,0.07),maxA:0.34}
+  {r:78,t:0.7,rx:Math.PI/2.8,ry:0.1, px:0,  py:0, pz:0,
+   hot:new THREE.Color(0.84,0.50,0.08),cool:new THREE.Color(0.12,0.07,0.01),maxA:0.54}
 ];
 var rings=ringDefs.map(function(d){
   var mat=_mkRingMat(d.hot,d.cool,d.maxA);
@@ -1440,7 +1453,7 @@ var rings=ringDefs.map(function(d){
   var halo=new THREE.Mesh(new THREE.TorusGeometry(d.r,d.t*3.0,12,120),haloMat);
   halo.rotation.x=d.rx;halo.rotation.y=d.ry;
   halo.position.set(d.px,d.py,d.pz);
-  scene.add(halo);
+  orbGroup.add(halo);
   var core=new THREE.Mesh(new THREE.TorusGeometry(d.r,d.t,24,120),mat);
   core.rotation.x=d.rx;core.rotation.y=d.ry;
   core.position.set(d.px,d.py,d.pz);
@@ -1448,7 +1461,7 @@ var rings=ringDefs.map(function(d){
   core.userData.mat=mat;
   core.userData.halo=halo;
   core.userData.haloMat=haloMat;
-  scene.add(core);
+  orbGroup.add(core);
   return core;
 });
 
